@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent, ReactNode } from 'react'
 import { clock, createDemoEvents, dateKey, eventCategories, freeSlots, isEvent, minutes, moveDate, overlaps, parseDate } from './events'
 import type { CalendarEvent, FreeSlot } from './events'
@@ -14,12 +14,22 @@ import type { Product } from './products'
 import { ProductCards, ProductImage } from './ProductCards'
 import './App.css'
 import './Timeline.css'
+import { selectEditorialCopy } from './data/editorialCopies'
+import type { EditorialCategory } from './data/editorialCopies'
 
 type Page = 'calendar' | 'discover' | 'favorites' | 'plans'
 type View = 'day' | 'week' | 'month'
 const weekdays = ['日', '月', '火', '水', '木', '金', '土']
 const fullDate = new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' })
 const image = (story: Story) => `${import.meta.env.BASE_URL}images/${story.image}`
+function editorialCategory(category: string | undefined): EditorialCategory | undefined {
+  if (category === 'カルチャー') return '男性ライフスタイル'
+  if (category === '自然') return 'アウトドア'
+  if (category === 'ビューティー') return '女性美容'
+  if (category === 'ファッション') return '働く女性ファッション'
+  if (category === 'グルメ') return 'グルメ'
+  return undefined
+}
 
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const paths: Record<string, ReactNode> = {
@@ -52,12 +62,13 @@ function Modal({ label, close, children, wide = false, swipe = false }: { label:
   </dialog>
 }
 
-function StoryCard({ story, favorite, onFavorite, onSave, onOpen, onAdd, onSkip, compact = false }: {
-  story: Story; favorite: boolean; onFavorite: () => void; onSave?: () => void; onOpen: () => void; onAdd?: () => void; onSkip?: () => void; compact?: boolean
+function StoryCard({ story, favorite, onFavorite, onSave, onOpen, onAdd, onSkip, compact = false, editorialCopy }: {
+  story: Story; favorite: boolean; onFavorite: () => void; onSave?: () => void; onOpen: () => void; onAdd?: () => void; onSkip?: () => void; compact?: boolean; editorialCopy?: string
 }) {
   const [drag, setDrag] = useState(0)
   const [flight, setFlight] = useState<'left' | 'right' | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
+  const startedAt = useRef(0)
   const suppressClick = useRef(false)
   const locked = useRef(false)
   const timer = useRef<number | undefined>(undefined)
@@ -78,6 +89,7 @@ function StoryCard({ story, favorite, onFavorite, onSave, onOpen, onAdd, onSkip,
   function down(event: PointerEvent<HTMLButtonElement>) {
     if (!onSkip || locked.current || !event.isPrimary || event.button !== 0) return
     start.current = { x: event.clientX, y: event.clientY }
+    startedAt.current = performance.now()
     suppressClick.current = false
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -88,12 +100,14 @@ function StoryCard({ story, favorite, onFavorite, onSave, onOpen, onAdd, onSkip,
     start.current = null
     suppressClick.current = Math.abs(distance) > 12
     setDrag(0)
-    if (Math.abs(distance) > 85 && Math.abs(distance) > Math.abs(vertical) * 1.3) fly(distance > 0 ? 'right' : 'left')
+    const elapsed = Math.max(1, performance.now() - startedAt.current)
+    if ((Math.abs(distance) > 85 || (Math.abs(distance) > 35 && Math.abs(distance) / elapsed > 0.65))
+      && Math.abs(distance) > Math.abs(vertical) * 1.3) fly(distance > 0 ? 'right' : 'left')
   }
   return <article className={`story-card tone-${storyTone(story.id)} ${compact ? 'compact' : ''} ${drag && !flight ? 'dragging' : ''} ${flight ? 'flying' : ''}`} style={{ transform: flight ? `translateX(${flight === 'right' ? '' : '-'}${Math.max(window.innerWidth, 700) * 1.2}px) rotate(${flight === 'right' ? 22 : -22}deg)` : `translateX(${drag}px) rotate(${drag / 24}deg)` }} aria-busy={!!flight}>
     <button className="story-open" onClick={() => { if (!suppressClick.current && !locked.current) onOpen(); suppressClick.current = false }} onPointerDown={down} onPointerMove={(event) => { if (start.current !== null && Math.abs(event.clientX - start.current.x) > Math.abs(event.clientY - start.current.y) * 1.3) { setDrag(event.clientX - start.current.x); suppressClick.current = true } }} onPointerUp={up} onPointerCancel={() => { start.current = null; setDrag(0); suppressClick.current = true }} style={{ touchAction: onSkip ? 'pan-y' : 'auto' }} aria-label={`記事を読む：${story.title.replace('\n', '')}`}>
       <div className="story-photo"><img src={image(story)} alt={story.spot} loading="lazy" draggable={false} /><span className="photo-tag">{story.label}</span>{story.sponsored && <span className="pr-badge">PR</span>}{Math.abs(drag) > 35 && <span className={`swipe-feedback ${drag > 0 ? 'add' : ''}`}>{drag > 0 ? '♥ お気に入り' : '今回はパス'}</span>}</div>
-      <div className="story-copy"><p className="magazine-label">{story.magazine} <span>— {story.issue.split(' / ')[0]}</span></p><h3>{story.title}</h3><div className="story-meta"><span><Icon name="pin" size={14} />{story.area}</span><span><Icon name="clock" size={14} />{storyKind(story) === 'article' ? '読みもの' : `${story.duration}分`}</span></div>{!compact && <p className="reason">{story.reason}</p>}{story.sponsored && <p className="sponsor-label">PR · {story.sponsored}</p>}</div>
+      <div className="story-copy"><p className="magazine-label">{story.magazine} <span>— {story.issue.split(' / ')[0]}</span></p><h3>{story.title}</h3><div className="story-meta"><span><Icon name="pin" size={14} />{story.area}</span><span><Icon name="clock" size={14} />{storyKind(story) === 'article' ? '読みもの' : `${story.duration}分`}</span></div>{!compact && <p className="reason">{editorialCopy ?? story.reason}</p>}{story.sponsored && <p className="sponsor-label">PR · {story.sponsored}</p>}</div>
     </button>
     <div className="card-actions">
       {onSkip && <button className="skip-button" disabled={!!flight} onClick={() => fly('left')}><Icon name="close" size={16} />今回はパス</button>}
@@ -205,12 +219,52 @@ export default function App() {
   const selectedDate = parseDate(selected)
   const slots = freeSlots(events, selected)
   const safeSlots = suggestionSlots(events, selected)
-  const suggestions = dailySuggestions(events, selected, [...(skipped[selected] ?? []), ...(skipped.discover ?? [])])
+  const suggestions = useMemo(() => dailySuggestions(events, selected, [...(skipped[selected] ?? []), ...(skipped.discover ?? [])]), [events, selected, skipped])
   const slot = slots.find((item) => item.start === slotChoice) ?? slots.find((item) => item.start >= 1080) ?? slots[0]
   const slotKey = `${selected}-${slot?.start}`
   const candidates = slot ? stories.filter((story) => storyKind(story) === 'experience' && safeSlots.some((safe) => safe.start >= slot.start && safe.end <= slot.end && fits(story, safe)) && ![...(skipped[selected] ?? []), ...(skipped.discover ?? []), ...reviewed].includes(story.id) && !events.some((event) => event.date === selected && event.storyId === story.id)) : []
   const recommended = candidates[0]
+  const recommendedCategory = recommended ? editorialCategory(storyCategory(recommended)) : undefined
+  const recommendedId = recommended?.id
+  const slotStart = slot?.start
+  const slotEnd = slot?.end
+  const recommendedCopy = recommendedId ? selectEditorialCopy({
+    date: selected,
+    events,
+    freeMinutes: slotStart !== undefined && slotEnd !== undefined ? slotEnd - slotStart : 0,
+    placement: 'Recommendation',
+    category: recommendedCategory,
+    recommendationId: recommendedId,
+    savedIds: favorites,
+    skippedIds: [...(skipped[selected] ?? []), ...(skipped.discover ?? [])],
+  }) : null
   const dayEvents = events.filter((event) => event.date === selected).sort((a, b) => a.start - b.start)
+  const tickerCopy = useMemo(() => selectEditorialCopy({
+    date: selected,
+    events,
+    freeMinutes: Math.max(0, ...freeSlots(events, selected).map((free) => free.end - free.start)),
+    placement: 'Ticker',
+    savedIds: favorites,
+    skippedIds: [...(skipped[selected] ?? []), ...(skipped.discover ?? [])],
+  }), [selected, events, favorites, skipped])
+  const whisperCopies = useMemo(() => {
+    const usedCopyIds = new Set([tickerCopy.id])
+    return suggestions.slice(0, 2).map((suggestion) => {
+      const copy = selectEditorialCopy({
+        date: selected,
+        events,
+        freeMinutes: suggestion.end - suggestion.start,
+        placement: 'Whisper',
+        category: editorialCategory(storyCategory(suggestion.story)),
+        recommendationId: suggestion.story.id,
+        savedIds: favorites,
+        skippedIds: [...(skipped[selected] ?? []), ...(skipped.discover ?? [])],
+        excludeCopyIds: [...usedCopyIds],
+      })
+      usedCopyIds.add(copy.id)
+      return { storyId: suggestion.story.id, copy }
+    })
+  }, [selected, events, suggestions, favorites, skipped, tickerCopy])
   const scheduledStory = (story: Story) => events.some((event) => event.date === selected && event.storyId === story.id)
   const weekStart = moveDate(selected, -((selectedDate.getDay() + 6) % 7))
   const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
@@ -298,6 +352,9 @@ export default function App() {
     </aside>
     <main className="main-content">
       <header className="topbar"><span>MAKE ROOM FOR SOMETHING GOOD</span><div><span className="status-dot" />あなたの暮らしに、ちょうどいい発見</div></header>
+      {page === 'calendar' && <button className="editorial-ticker" onClick={() => setArticle(stories.find((story) => story.id === tickerCopy.recommendationId) ?? recommended ?? stories[0])} aria-label={`編集部から今日のひとこと：${tickerCopy.text}。タップして関連記事を読む`}>
+        <span className="ticker-track"><span><Icon name="sparkle" size={15} />{tickerCopy.text}<b>FROM {tickerCopy.magazineId.replaceAll('-', ' ').toUpperCase()}</b></span><span aria-hidden="true"><Icon name="sparkle" size={15} />{tickerCopy.text}<b>FROM {tickerCopy.magazineId.replaceAll('-', ' ').toUpperCase()}</b></span></span>
+      </button>}
       {storageError && <div className="storage-error" role="alert">{storageError}<button onClick={() => setStorageError(saveData({ events, favorites, skipped }))}>保存を再試行</button></div>}
       <section className={`page-intro ${page === 'calendar' ? 'calendar-intro' : ''}`}><div><p className="eyebrow">{page === 'calendar' ? 'YOUR PERSONAL EDITOR' : page === 'discover' ? 'THE EDITOR’S SELECTION' : page === 'plans' ? 'A DAY, BEAUTIFULLY PLANNED' : 'YOUR LITTLE COLLECTION'}</p><h1>{page === 'calendar' ? 'カレンダー' : page === 'discover' ? '次の「行ってみたい」に出会う。' : page === 'plans' ? '一日を、ひとつの物語に。' : '好きな時間を、とっておく。'}</h1><p>{page === 'calendar' ? '日々の隙間に、雑誌を。' : page === 'discover' ? '雑誌をめくるように、街の楽しみを見つけよう。' : page === 'plans' ? '編集部が選んだ記事をつなぐ、小さなお出かけプラン。' : '心が動いた場所を、次のお出かけのきっかけに。'}</p></div><button className="primary add-event" aria-label="予定を追加" onClick={newEvent}><Icon name="plus" size={18} />予定を追加</button></section>
 
@@ -317,25 +374,25 @@ export default function App() {
                 const items = events.filter((event) => event.date === date).sort((a, b) => a.start - b.start)
                 const limit = view === 'month' ? 2 : 5
                 return <div className={`calendar-cell ${date === selected ? 'selected' : ''} ${day.getMonth() !== selectedDate.getMonth() ? 'outside' : ''}`} key={date}>
-                  <button className={`date-button ${date === today ? 'is-today' : ''}`} onClick={() => { selectDate(date); if (view === 'month') setView('day') }} aria-pressed={date === selected} aria-current={date === today ? 'date' : undefined} aria-label={`${fullDate.format(day)}、予定${items.length}件`}>{view !== 'month' && <span>{weekdays[day.getDay()]}</span>}<strong>{day.getDate()}</strong></button>
+                  <button className={`date-button ${date === today ? 'is-today' : ''}`} onClick={() => { selectDate(date); setView('day') }} aria-pressed={date === selected} aria-current={date === today ? 'date' : undefined} aria-label={`${fullDate.format(day)}、予定${items.length}件`}>{view !== 'month' && <span>{weekdays[day.getDay()]}</span>}<strong>{day.getDate()}</strong></button>
                   <div className="cell-events">{items.slice(0, limit).map((event) => <button className={`mini-event ${event.category} category-${displayCategory(event)}`} key={event.id} title={`${clock(event.start)}–${clock(event.end)} ${event.title}`} onClick={() => { selectDate(date); setDetail(event) }}><time>{clock(event.start)}</time><span>{event.storyId && stories.find((story) => story.id === event.storyId)?.sponsored ? 'PR · ' : ''}{event.title}</span></button>)}{items.length > limit && <button className="more-events" onClick={() => { selectDate(date); setView('day') }}>+{items.length - limit}件</button>}{items.length === 0 && <span className="free-day">余白</span>}</div>
                 </div>
               })}
             </div>}
             <div className="calendar-legend"><span><i className="work-dot" />確定した予定</span><span><i className="proposal-dot" />雑誌からの仮提案</span><span className="local-label">デモ推薦 · 移動目安10分 · 最大3件</span></div>
-            <div className="day-agenda">
+            {view === 'day' && <div className="day-agenda">
               <div className="agenda-heading"><h3>{fullDate.format(selectedDate)}</h3><button className="text-button" onClick={newEvent}><Icon name="plus" size={15} />予定を追加</button></div>
               {dayEvents.length === 0 && <p className="empty-agenda">予定はありません。自由な一日を、どう過ごしますか？</p>}
-              <DayTimeline date={selected} events={dayEvents} suggestions={suggestions} onEvent={setDetail} onSuggestion={(item) => setProposal(item.story.id)} />
+              <DayTimeline date={selected} events={dayEvents} suggestions={suggestions} whispers={whisperCopies} onEvent={setDetail} onSuggestion={(item) => setProposal(item.story.id)} />
               <div className="free-time-banner"><Icon name="sparkle" size={22} /><div><strong>{slots.length ? `${slots.length}つの空き時間が見つかりました` : 'この日は予定がいっぱいです'}</strong><p>{slots.length ? '45分以上の余白から、おすすめをお届け。' : '別の日を選んで、次の寄り道を探しましょう。'}</p></div></div>
               {slots.some((item) => fits(stories[3], item)) && <button className="native-ad" onClick={() => setArticle(stories[3])}><img src={image(stories[3])} alt="" /><span><small>PR · Calendar Native Ads</small><strong>45分の余白に、緑の寄り道。</strong><span>記事を読んでから、予定に追加できます。</span></span><Icon name="arrow" size={18} /></button>}
-            </div>
+            </div>}
           </section>
           <aside className="recommendation-panel" aria-label="空き時間へのおすすめ">
             <div className="section-heading"><div><p className="eyebrow">JUST FOR YOUR FREE TIME</p><h2><Icon name="sparkle" size={20} />余白に、ひとつ提案。</h2></div></div>
             <p className="recommendation-intro">{selectedDate.getDay() === 5 && slot && slot.start >= 1080 ? '仕事終わりに、ちょっと寄り道しませんか？' : slot && slot.start >= 1080 ? '今日の終わりに、自分だけのごほうびを。' : '次の予定まで、好きなことをひとつ。'}</p>
             <div className="slot-picker" aria-label="提案する空き時間">{slots.map((item) => <button key={item.start} aria-pressed={slot?.start === item.start} onClick={() => setSlotChoice(item.start)}><Icon name="clock" size={13} />{clock(item.start)}–{clock(item.end)}</button>)}</div>
-            {recommended ? <StoryCard key={`${slotKey}-${recommended.id}`} story={recommended} favorite={favorites.includes(recommended.id)} onFavorite={() => favorite(recommended)} onSave={() => saveAndAdvance(recommended)} onOpen={() => setArticle(recommended)} onAdd={() => addStory(recommended)} onSkip={() => skipStory(recommended)} /> : <div className="recommendation-empty"><Icon name="discover" size={32} /><h3>{slot ? 'この時間の提案は、ここまで。' : '新しい余白を探しましょう。'}</h3><p>{slot ? '別の空き時間や日付も試してみてください。' : '予定の編集や日付の移動で、おすすめが変わります。'}</p>{slot && ((skipped[selected]?.length ?? 0) > 0 || reviewed.length > 0) && <button className="secondary" onClick={() => { persist(events, favorites, { ...skipped, [selected]: [] }); setReviewed([]) }}>もう一度見る</button>}</div>}
+            {recommended ? <StoryCard key={`${slotKey}-${recommended.id}`} story={recommended} editorialCopy={recommendedCopy?.text} favorite={favorites.includes(recommended.id)} onFavorite={() => favorite(recommended)} onSave={() => saveAndAdvance(recommended)} onOpen={() => setArticle(recommended)} onAdd={() => addStory(recommended)} onSkip={() => skipStory(recommended)} /> : <div className="recommendation-empty"><Icon name="discover" size={32} /><h3>{slot ? 'この時間の提案は、ここまで。' : '新しい余白を探しましょう。'}</h3><p>{slot ? '別の空き時間や日付も試してみてください。' : '予定の編集や日付の移動で、おすすめが変わります。'}</p>{slot && ((skipped[selected]?.length ?? 0) > 0 || reviewed.length > 0) && <button className="secondary" onClick={() => { persist(events, favorites, { ...skipped, [selected]: [] }); setReviewed([]) }}>もう一度見る</button>}</div>}
             <p className="swipe-hint">← パス <span>ドラッグ / スワイプ</span> ♥ 保存 →</p>
             <div className="editor-note"><span>FROM THE EDITORS</span><p>何もしない時間も、<br />何かに出会う時間も。<br />あなたの余白は、あなたのもの。</p><button className="text-button" onClick={() => navigatePage('discover')}>ほかの記事を見つける <Icon name="arrow" size={16} /></button></div>
           </aside>

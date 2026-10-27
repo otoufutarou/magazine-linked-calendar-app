@@ -4,11 +4,13 @@ import type { CalendarEvent } from './events'
 import { categoryForStory, displayCategory, positionEvents } from './recommendations'
 import type { Suggestion } from './recommendations'
 import { stories } from './stories'
+import type { EditorialCopy } from './data/editorialCopies'
 
 const scale = 1.2
 
-export function DayTimeline({ date, events, suggestions, onEvent, onSuggestion }: {
+export function DayTimeline({ date, events, suggestions, whispers, onEvent, onSuggestion }: {
   date: string; events: CalendarEvent[]; suggestions: Suggestion[]
+  whispers: { storyId: string; copy: EditorialCopy }[]
   onEvent: (event: CalendarEvent) => void; onSuggestion: (suggestion: Suggestion) => void
 }) {
   const [now, setNow] = useState(() => new Date())
@@ -19,7 +21,7 @@ export function DayTimeline({ date, events, suggestions, onEvent, onSuggestion }
   }, [])
   useEffect(() => { if (scroll.current) scroll.current.scrollTop = 8 * 60 * scale }, [date])
   const currentMinute = now.getHours() * 60 + now.getMinutes()
-  return <div className="timeline-scroll" ref={scroll} role="region" aria-label="1日の縦型タイムライン" tabIndex={0}>
+  return <div className="timeline-assembly"><div className="timeline-scroll" ref={scroll} role="region" aria-label="1日の縦型タイムライン" tabIndex={0}>
     <div className="day-timeline" style={{ height: 1440 * scale }}>
       {Array.from({ length: 24 }, (_, hour) => <div className="timeline-hour" key={hour} style={{ top: hour * 60 * scale }}><time>{clock(hour * 60)}</time><span /></div>)}
       <div className="timeline-events">
@@ -38,5 +40,13 @@ export function DayTimeline({ date, events, suggestions, onEvent, onSuggestion }
         {date === dateKey(now) && <div className="now-line" style={{ top: currentMinute * scale }} aria-label={`現在時刻 ${clock(currentMinute)}`}><span /> <time>{clock(currentMinute)}</time></div>}
       </div>
     </div>
+  </div>
+  {whispers.length > 0 && <div className="whisper-list" aria-label="編集部の手書きメモ">{whispers.map(({ storyId, copy }, index) => {
+    const suggestion = suggestions.find((item) => item.story.id === storyId)
+    if (!suggestion) return null
+    return <button className="whisper-note" key={copy.id} onClick={() => onSuggestion(suggestion)} aria-label={`編集部メモ ${clock(suggestion.start)}：${copy.text}。タップして提案を開く`}>
+      <span className="whisper-time">{clock(suggestion.start)}</span><span className="whisper-mark">✳</span><span>{copy.text}</span><small>{index === 0 ? 'FROM THE EDITORS' : copy.magazineId.toUpperCase()}</small>
+    </button>
+  })}</div>}
   </div>
 }
