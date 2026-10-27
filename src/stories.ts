@@ -19,6 +19,7 @@ export type Story = {
   price: string
   sponsored?: 'Sponsored Recommendation' | 'Calendar Native Ads' | 'Editorial Sponsored Story'
   category?: 'グルメ' | 'カルチャー' | '自然' | 'ビューティー' | 'ファッション'
+  kind?: 'experience' | 'article'
 }
 
 export const stories: Story[] = [
@@ -181,6 +182,15 @@ export const stories: Story[] = [
 ]
 
 stories.push(
+  {
+    id: 'selfcare-reading', kind: 'article', title: '忙しい日に、\n小さなセルフケアを。',
+    subtitle: '読みもの / 自分をいたわる、夜の小さな習慣。',
+    magazine: 'LUMIÈRE ME', issue: 'Vol. 04 / 余白の習慣', area: 'おうちで読む', duration: 45, period: 'any',
+    image: 'beauty.svg', label: 'READING', category: 'ビューティー',
+    reason: '予定を増やさず、読むだけでも。今日の自分にやさしい時間を。',
+    paragraphs: ['忙しい日には、何かを足すよりも、ひとつ手放してみよう。画面から目を離し、肩の力をゆっくり抜く。', '好きな香りを選ぶ、温かいお茶を淹れる。自分が心地よく感じる小さな習慣を探してみる。', '明日も続ける約束はしなくていい。今日の自分に似合う、ささやかな休息を。'],
+    spot: '編集部の読みもの', address: 'オンラインの架空記事', hours: 'いつでも', price: '無料',
+  },
   {
     id: 'beauty', title: 'わたしを整える、\n45分の美容時間。',
     subtitle: '香りと色を試す、自分のためのビューティーラボ。',
