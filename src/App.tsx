@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent, ReactNode } from 'react'
 import { clock, createDemoEvents, dateKey, freeSlots, isEvent, minutes, moveDate, overlaps, parseDate } from './events'
 import type { CalendarEvent, FreeSlot } from './events'
-import { dayPlan, fits, stories, storyCategory, storyStart, storyTone } from './stories'
+import { dayPlan, fits, magazineEditions, magazineFor, stories, storyCategory, storyStart, storyTone } from './stories'
 import type { Story } from './stories'
 import { loadData, saveData } from './storage'
 import { planConflict, planEvents } from './plans'
@@ -63,12 +63,12 @@ function StoryCard({ story, favorite, onFavorite, onOpen, onAdd, onSkip, compact
     start.current = null
     suppressClick.current = Math.abs(distance) > 12
     setDrag(0)
-    if (distance > 85 && onAdd) onAdd()
+    if (distance > 85) onFavorite()
     else if (distance < -85) onSkip?.()
   }
   return <article className={`story-card tone-${storyTone(story.id)} ${compact ? 'compact' : ''} ${drag ? 'dragging' : ''}`} style={{ transform: `translateX(${drag * .45}px) translateY(var(--card-lift, 0px)) rotate(${drag / 65}deg)` }}>
     <button className="story-open" onClick={() => { if (!suppressClick.current) onOpen(); suppressClick.current = false }} onPointerDown={down} onPointerMove={(event) => { if (start.current !== null) setDrag(event.clientX - start.current) }} onPointerUp={up} onPointerCancel={() => { start.current = null; setDrag(0); suppressClick.current = true }} style={{ touchAction: onSkip ? 'pan-y' : 'auto' }} aria-label={`記事を読む：${story.title.replace('\n', '')}`}>
-      <div className="story-photo"><img src={image(story)} alt={story.spot} loading="lazy" draggable={false} /><span className="photo-tag">{story.label}</span>{story.sponsored && <span className="pr-badge">PR</span>}{Math.abs(drag) > 35 && <span className={`swipe-feedback ${drag > 0 ? 'add' : ''}`}>{drag > 0 ? '予定に追加' : '今回はパス'}</span>}</div>
+      <div className="story-photo"><img src={image(story)} alt={story.spot} loading="lazy" draggable={false} /><span className="photo-tag">{story.label}</span>{story.sponsored && <span className="pr-badge">PR</span>}{Math.abs(drag) > 35 && <span className={`swipe-feedback ${drag > 0 ? 'add' : ''}`}>{drag > 0 ? '♥ お気に入り' : '今回はパス'}</span>}</div>
       <div className="story-copy"><p className="magazine-label">{story.magazine} <span>— {story.issue.split(' / ')[0]}</span></p><h3>{story.title}</h3><div className="story-meta"><span><Icon name="pin" size={14} />{story.area}</span><span><Icon name="clock" size={14} />{story.duration}分</span></div>{!compact && <p className="reason">{story.reason}</p>}{story.sponsored && <p className="sponsor-label">PR · {story.sponsored}</p>}</div>
     </button>
     <div className="card-actions">
@@ -79,18 +79,56 @@ function StoryCard({ story, favorite, onFavorite, onOpen, onAdd, onSkip, compact
   </article>
 }
 
+function MagazineCover({ story, onOpen }: { story: Story; onOpen: () => void }) {
+  const edition = magazineFor(story)
+  return <button className={`magazine-cover tone-${storyTone(story.id)}`} onClick={onOpen} aria-label={`${edition.name}の提案を開く`}>
+    <img src={`${import.meta.env.BASE_URL}images/${edition.image}`} alt="" />
+    <span className="cover-top">ORIGINAL FICTIONAL MAGAZINE · {story.issue.split(' / ')[0]}</span>
+    <strong>{edition.name}</strong><span className="cover-genre">{edition.genre}</span>
+    <span className="cover-line">{edition.line}</span><span className="cover-open">タップして提案を読む ↗</span>
+  </button>
+}
+
+function ProductCards({ story }: { story: Story }) {
+  const edition = magazineFor(story)
+  return <section className="product-section"><p className="eyebrow">THE EDITOR’S OBJECTS</p><h3>この時間に、連れていきたい。</h3><div className="product-grid">
+    {[{ name: edition.product, price: edition.price, image: edition.image }, { name: `${edition.name} 最新号`, price: '¥980', image: story.image }].map((product) => <article className="product-card" key={product.name}><img src={`${import.meta.env.BASE_URL}images/${product.image}`} alt={product.name} /><div><small>架空の編集部セレクト</small><h4>{product.name}</h4><p>{product.price}</p></div></article>)}
+  </div><p className="fiction-note">商品・価格はすべて架空です。購入機能はありません。</p></section>
+}
+
+function EventDetail({ event, favorite, onFavorite, onEdit, onOpen, close }: { event: CalendarEvent; favorite: boolean; onFavorite: (story: Story) => void; onEdit: () => void; onOpen: (story: Story) => void; close: () => void }) {
+  const related = stories.find((story) => story.id === event.storyId) ?? stories.find((story) => story.id === (event.category === 'work' ? 'style' : 'beauty'))!
+  return <Modal label="予定の詳細" close={close} wide><div className={`event-detail ${event.category} tone-${storyTone(related.id)}`}>
+    <div className="event-detail-heading"><p className="eyebrow">{event.category === 'work' ? 'WORK' : event.category === 'personal' ? 'PERSONAL' : 'EDITORIAL OUTING'}</p><h2>{event.title}</h2><p>{fullDate.format(parseDate(event.date))} · {parseDate(event.date).getFullYear()}</p></div>
+    <div className="event-detail-body"><dl className="event-facts"><div><dt>時間</dt><dd>{clock(event.start)} – {clock(event.end)}</dd></div><div><dt>場所</dt><dd>{event.place || (event.storyId ? related.address : '未設定')}</dd></div><div><dt>メモ</dt><dd>{event.note || 'メモはありません'}</dd></div></dl><button className="secondary" onClick={onEdit}>予定を編集する</button>
+    <section className="related-edition"><div><p className="eyebrow">A LITTLE INSPIRATION</p><h3>この予定のあとに、<br />新しい「好き」を。</h3><p>{related.reason}</p><button className="favorite-detail secondary" aria-pressed={favorite} onClick={() => onFavorite(related)}><Icon name="heart" />{favorite ? '保存済み' : 'おすすめを保存'}</button></div><MagazineCover story={related} onOpen={() => onOpen(related)} /></section><ProductCards story={related} /></div>
+  </div></Modal>
+}
+
 function EventForm({ event, events, onSave, onDelete, close }: { event: CalendarEvent; events: CalendarEvent[]; onSave: (event: CalendarEvent) => void; onDelete: () => void; close: () => void }) {
   const [error, setError] = useState('')
   const exists = events.some((item) => item.id === event.id)
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const data = new FormData(e.currentTarget)
-    const candidate: CalendarEvent = { ...event, title: String(data.get('title')).trim(), date: String(data.get('date')), start: minutes(String(data.get('start'))), end: minutes(String(data.get('end'))), category: data.get('category') as CalendarEvent['category'], note: String(data.get('note')).trim() }
+    const candidate: CalendarEvent = { ...event, title: String(data.get('title')).trim(), date: String(data.get('date')), start: minutes(String(data.get('start'))), end: minutes(String(data.get('end'))), category: data.get('category') as CalendarEvent['category'], note: String(data.get('note')).trim(), place: String(data.get('place')).trim() }
     if (!isEvent(candidate)) { setError('タイトル・日付・時間を確認してください。終了時刻は開始時刻より後にしてください。'); return }
     if (overlaps(events, candidate)) { setError('同じ時間に別の予定があります。時間を調整してください。'); return }
     onSave(candidate)
   }
-  return <Modal label={exists ? '予定を編集' : '予定を追加'} close={close}><form className="event-form" onSubmit={submit}><p className="eyebrow">YOUR TIME, YOUR LIFE</p><h2>{exists ? '予定を編集' : '新しい予定'}</h2><label>タイトル<input name="title" defaultValue={event.title} placeholder="どんな時間にしますか？" required maxLength={80} autoFocus /></label><label>日付<input name="date" type="date" defaultValue={event.date} required min="1900-01-01" max="2100-12-31" /></label><div className="form-row"><label>開始<input name="start" type="time" defaultValue={clock(event.start)} required /></label><label>終了<input name="end" type="time" defaultValue={clock(event.end)} required /></label></div><label>カテゴリー<select name="category" defaultValue={event.category}><option value="work">仕事</option><option value="personal">プライベート</option><option value="outing">お出かけ</option></select></label><label>メモ<textarea name="note" defaultValue={event.note} rows={3} maxLength={1000} /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions">{exists && <button type="button" className="danger-button" onClick={onDelete}>予定を削除</button>}<button type="submit" className="primary">保存する <Icon name="check" size={17} /></button></div></form></Modal>
+  return <Modal label={exists ? '予定を編集' : '予定を追加'} close={close}>
+    <form className="event-form" onSubmit={submit}>
+      <p className="eyebrow">YOUR TIME, YOUR LIFE</p><h2>{exists ? '予定を編集' : '新しい予定'}</h2>
+      <label>タイトル<input name="title" defaultValue={event.title} placeholder="どんな時間にしますか？" required maxLength={80} autoFocus /></label>
+      <label>日付<input name="date" type="date" defaultValue={event.date} required min="1900-01-01" max="2100-12-31" /></label>
+      <div className="form-row"><label>開始<input name="start" type="time" defaultValue={clock(event.start)} required /></label><label>終了<input name="end" type="time" defaultValue={clock(event.end)} required /></label></div>
+      <label>カテゴリー<select name="category" defaultValue={event.category}><option value="work">仕事</option><option value="personal">プライベート</option><option value="outing">お出かけ</option></select></label>
+      <label>場所<input name="place" defaultValue={event.place ?? (event.storyId ? stories.find((story) => story.id === event.storyId)?.address : '')} placeholder="場所・住所を入力" maxLength={200} /></label>
+      <label>メモ<textarea name="note" defaultValue={event.note} rows={3} maxLength={1000} /></label>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="form-actions">{exists && <button type="button" className="danger-button" onClick={onDelete}>予定を削除</button>}<button type="submit" className="primary">保存する <Icon name="check" size={17} /></button></div>
+    </form>
+  </Modal>
 }
 
 export default function App() {
@@ -100,12 +138,13 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>(() => initial.data?.favorites ?? [])
   const [storageError, setStorageError] = useState(initial.error)
   const [page, setPage] = useState<Page>('calendar')
-  const [view, setView] = useState<View>('week')
+  const [view, setView] = useState<View>('month')
   const [selected, setSelected] = useState(today)
   const [slotChoice, setSlotChoice] = useState<number | null>(null)
   const [skipped, setSkipped] = useState<Record<string, string[]>>({})
   const [article, setArticle] = useState<Story | null>(null)
   const [editor, setEditor] = useState<CalendarEvent | null>(null)
+  const [detail, setDetail] = useState<CalendarEvent | null>(null)
   const [toast, setToast] = useState('')
   const [filter, setFilter] = useState('すべて')
   const [planDate, setPlanDate] = useState(() => {
@@ -188,7 +227,7 @@ export default function App() {
     setToast('一日プランの4件をカレンダーに追加しました')
     window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
   }
-  const filteredStories = stories.filter((story) => (page !== 'favorites' || favorites.includes(story.id)) && (filter === 'すべて' || storyCategory(story) === filter))
+  const filteredStories = stories.filter((story) => (page !== 'favorites' || favorites.includes(story.id)) && (page === 'favorites' || !(skipped.discover ?? []).includes(story.id)) && (filter === 'すべて' || storyCategory(story) === filter))
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -206,9 +245,9 @@ export default function App() {
       <section className="page-intro"><div><p className="eyebrow">{page === 'calendar' ? 'YOUR PERSONAL EDITOR' : page === 'discover' ? 'THE EDITOR’S SELECTION' : page === 'plans' ? 'A DAY, BEAUTIFULLY PLANNED' : 'YOUR LITTLE COLLECTION'}</p><h1>{page === 'calendar' ? <>毎日に、ちょっといい<span>余白</span>を。</> : page === 'discover' ? '次の「行ってみたい」に出会う。' : page === 'plans' ? '一日を、ひとつの物語に。' : '好きな時間を、とっておく。'}</h1><p>{page === 'calendar' ? '予定のあいまに、あなたらしい寄り道を。' : page === 'discover' ? '雑誌をめくるように、街の楽しみを見つけよう。' : page === 'plans' ? '編集部が選んだ記事をつなぐ、小さなお出かけプラン。' : '心が動いた場所を、次のお出かけのきっかけに。'}</p></div><button className="primary add-event" onClick={newEvent}><Icon name="plus" size={18} />予定を追加</button></section>
 
       {page === 'calendar' && <>
-        <section className="hero">
+        <section className="hero" aria-label="編集部の特集">
           <img src={`${import.meta.env.BASE_URL}images/hero.jpg`} alt="食事をゆっくり楽しむレストランの風景（イメージ）" />
-          <div className="hero-shade" /><div className="hero-copy"><p className="hero-kicker">A LITTLE DETOUR, A BETTER DAY</p><h2>まっすぐ帰るには、<br />もったいない夜がある。</h2><p>一杯のワイン、一冊の本、新しい景色。<br />いつもの毎日に、小さなときめきを。</p><button onClick={() => setArticle(stories[0])}>今夜の寄り道を読む <Icon name="arrow" size={18} /></button></div><span className="hero-issue">LIFE □ &nbsp; / &nbsp; THE EVENING ISSUE</span>
+          <div className="hero-shade" /><div className="hero-copy"><p className="hero-kicker">A LITTLE DETOUR, A BETTER DAY</p><h2>まっすぐ帰るには、<br />もったいない夜がある。</h2><p>一杯のワイン、一冊の本、新しい景色。<br />いつもの毎日に、小さなときめきを。</p><button onClick={() => setArticle(stories[0])}>今夜の寄り道を読む <Icon name="arrow" size={18} /></button></div><span className="hero-issue">HOMME DAYS &nbsp; / &nbsp; THE EVENING ISSUE</span>
         </section>
         <div className="workspace">
           <section className="calendar-panel" aria-label="カレンダー">
@@ -219,9 +258,10 @@ export default function App() {
               {days.map((date) => {
                 const day = parseDate(date)
                 const items = events.filter((event) => event.date === date).sort((a, b) => a.start - b.start)
+                const limit = view === 'month' ? 2 : 5
                 return <div className={`calendar-cell ${date === selected ? 'selected' : ''} ${day.getMonth() !== selectedDate.getMonth() ? 'outside' : ''}`} key={date}>
                   <button className={`date-button ${date === today ? 'is-today' : ''}`} onClick={() => selectDate(date)} aria-pressed={date === selected} aria-current={date === today ? 'date' : undefined} aria-label={`${fullDate.format(day)}、予定${items.length}件`}>{view !== 'month' && <span>{weekdays[day.getDay()]}</span>}<strong>{day.getDate()}</strong></button>
-                  <div className="cell-events">{items.slice(0, view === 'month' ? 4 : 5).map((event) => <button className={`mini-event ${event.category} ${event.category === 'outing' ? `tone-${storyTone(event.storyId)}` : ''}`} key={event.id} title={`${clock(event.start)}–${clock(event.end)} ${event.title}`} onClick={() => { selectDate(date); setEditor(event) }}><time>{clock(event.start)}</time><span>{event.storyId && stories.find((story) => story.id === event.storyId)?.sponsored ? 'PR · ' : ''}{event.title}</span></button>)}{items.length > (view === 'month' ? 4 : 5) && <button className="more-events" onClick={() => selectDate(date)}>+{items.length - (view === 'month' ? 4 : 5)}件</button>}{items.length === 0 && view !== 'month' && <span className="free-day">余白のある日</span>}</div>
+                  <div className="cell-events">{items.slice(0, limit).map((event) => <button className={`mini-event ${event.category} ${event.category === 'outing' ? `tone-${storyTone(event.storyId)}` : ''}`} key={event.id} title={`${clock(event.start)}–${clock(event.end)} ${event.title}`} onClick={() => { selectDate(date); setDetail(event) }}><time>{clock(event.start)}</time><span>{event.storyId && stories.find((story) => story.id === event.storyId)?.sponsored ? 'PR · ' : ''}{event.title}</span></button>)}{items.length > limit && <button className="more-events" onClick={() => selectDate(date)}>+{items.length - limit}件</button>}{items.length === 0 && view !== 'month' && <span className="free-day">余白のある日</span>}</div>
                 </div>
               })}
             </div>
@@ -229,7 +269,7 @@ export default function App() {
             <div className="day-agenda">
               <div className="agenda-heading"><h3>{fullDate.format(selectedDate)}</h3><button className="text-button" onClick={newEvent}><Icon name="plus" size={15} />予定を追加</button></div>
               {dayEvents.length === 0 && <p className="empty-agenda">予定はありません。自由な一日を、どう過ごしますか？</p>}
-              {dayEvents.map((event) => <button className={`agenda-event ${event.category} ${event.category === 'outing' ? `tone-${storyTone(event.storyId)}` : ''}`} key={event.id} onClick={() => setEditor(event)}><span className="agenda-time">{clock(event.start)}<small>{clock(event.end)}</small></span><i /><span><strong>{event.title}</strong><small>{event.storyId ? `${stories.find((story) => story.id === event.storyId)?.sponsored ? 'PR · ' : ''}雑誌から見つけたお出かけ` : event.category === 'work' ? '仕事' : 'プライベート'}</small></span><span className="edit-hint">編集 ›</span></button>)}
+              {dayEvents.map((event) => <button className={`agenda-event ${event.category} ${event.category === 'outing' ? `tone-${storyTone(event.storyId)}` : ''}`} key={event.id} onClick={() => setDetail(event)}><span className="agenda-time">{clock(event.start)}<small>{clock(event.end)}</small></span><i /><span><strong>{event.title}</strong><small>{event.storyId ? `${stories.find((story) => story.id === event.storyId)?.sponsored ? 'PR · ' : ''}雑誌から見つけたお出かけ` : event.category === 'work' ? '仕事' : 'プライベート'}</small></span><span className="edit-hint">詳細 ›</span></button>)}
               <div className="free-time-banner"><Icon name="sparkle" size={22} /><div><strong>{slots.length ? `${slots.length}つの空き時間が見つかりました` : 'この日は予定がいっぱいです'}</strong><p>{slots.length ? '45分以上の余白から、おすすめをお届け。' : '別の日を選んで、次の寄り道を探しましょう。'}</p></div></div>
               {slots.some((item) => fits(stories[3], item)) && <button className="native-ad" onClick={() => setArticle(stories[3])}><img src={image(stories[3])} alt="" /><span><small>PR · Calendar Native Ads</small><strong>45分の余白に、緑の寄り道。</strong><span>記事を読んでから、予定に追加できます。</span></span><Icon name="arrow" size={18} /></button>}
             </div>
@@ -239,16 +279,19 @@ export default function App() {
             <p className="recommendation-intro">{selectedDate.getDay() === 5 && slot && slot.start >= 1080 ? '仕事終わりに、ちょっと寄り道しませんか？' : slot && slot.start >= 1080 ? '今日の終わりに、自分だけのごほうびを。' : '次の予定まで、好きなことをひとつ。'}</p>
             <div className="slot-picker" aria-label="提案する空き時間">{slots.map((item) => <button key={item.start} aria-pressed={slot?.start === item.start} onClick={() => setSlotChoice(item.start)}><Icon name="clock" size={13} />{clock(item.start)}–{clock(item.end)}</button>)}</div>
             {recommended ? <StoryCard key={`${slotKey}-${recommended.id}`} story={recommended} favorite={favorites.includes(recommended.id)} onFavorite={() => favorite(recommended)} onOpen={() => setArticle(recommended)} onAdd={() => addStory(recommended)} onSkip={() => skipStory(recommended)} /> : <div className="recommendation-empty"><Icon name="discover" size={32} /><h3>{slot ? 'この時間の提案は、ここまで。' : '新しい余白を探しましょう。'}</h3><p>{slot ? '別の空き時間や日付も試してみてください。' : '予定の編集や日付の移動で、おすすめが変わります。'}</p>{slot && (skipped[slotKey]?.length ?? 0) > 0 && <button className="secondary" onClick={() => setSkipped((current) => ({ ...current, [slotKey]: [] }))}>もう一度見る</button>}</div>}
-            <p className="swipe-hint">← パス <span>ドラッグ / スワイプ</span> 予定に追加 →</p>
+            <p className="swipe-hint">← パス <span>ドラッグ / スワイプ</span> ♥ 保存 →</p>
             <div className="editor-note"><span>FROM THE EDITORS</span><p>何もしない時間も、<br />何かに出会う時間も。<br />あなたの余白は、あなたのもの。</p><button className="text-button" onClick={() => navigatePage('discover')}>ほかの記事を見つける <Icon name="arrow" size={16} /></button></div>
           </aside>
         </div>
       </>}
 
       {(page === 'discover' || page === 'favorites') && <section className="collection">
-        <div className="collection-toolbar"><div className="filter-tabs" aria-label="記事カテゴリー">{['すべて', 'グルメ', 'カルチャー', '自然'].map((label) => <button key={label} aria-pressed={filter === label} onClick={() => setFilter(label)}>{label}</button>)}</div><span>{page === 'favorites' ? `${favorites.length}件の保存` : `${stories.length}の小さな寄り道`}</span></div>
+        {page === 'discover' && <section className="magazine-shelf" aria-label="架空の雑誌コレクション"><div className="section-heading"><div><p className="eyebrow">SIX PERSPECTIVES. YOUR NEXT CHAPTER.</p><h2>今日の気分で、表紙を選ぶ。</h2></div></div><div className="magazine-strip">{magazineEditions.map((edition) => <MagazineCover key={edition.name} story={stories.find((story) => story.magazine === edition.name)!} onOpen={() => setArticle(stories.find((story) => story.magazine === edition.name)!)} />)}</div><p className="fiction-note">すべてオリジナルの架空雑誌です。横スクロールで6つの視点を。</p></section>}
+        <div className="collection-toolbar"><div className="filter-tabs" aria-label="記事カテゴリー">{['すべて', 'グルメ', 'カルチャー', '自然', 'ビューティー', 'ファッション'].map((label) => <button key={label} aria-pressed={filter === label} onClick={() => setFilter(label)}>{label}</button>)}</div><span>{page === 'favorites' ? `${favorites.length}件の保存` : `${stories.length}の小さな寄り道`}</span></div>
         <div className="collection-date"><Icon name="calendar" size={18} /><label>予定の追加先 <input type="date" value={selected} min="1900-01-01" max="2100-12-31" onChange={(e) => { if (e.target.value) selectDate(e.target.value) }} /></label><button className="text-button" onClick={openCalendar}>カレンダーを見る <Icon name="arrow" size={15} /></button></div>
-        <div className="story-grid">{filteredStories.map((story) => <StoryCard key={story.id} story={story} compact favorite={favorites.includes(story.id)} onFavorite={() => favorite(story)} onOpen={() => setArticle(story)} />)}</div>
+        {page === 'discover' && <p className="discovery-hint">← パス · スワイプで次の発見へ · 右にスワイプで保存 ♥</p>}
+        <div className="story-grid">{filteredStories.map((story) => <StoryCard key={story.id} story={story} compact favorite={favorites.includes(story.id)} onFavorite={() => favorite(story)} onOpen={() => setArticle(story)} onSkip={page === 'discover' ? () => { setSkipped((current) => ({ ...current, discover: [...(current.discover ?? []), story.id] })); setToast('今回はパス。次の発見を楽しみましょう') } : undefined} />)}</div>
+        {page === 'discover' && filteredStories.length === 0 && <div className="collection-empty"><p>このカテゴリーの提案はここまで。</p><button className="secondary" onClick={() => setSkipped((current) => ({ ...current, discover: [] }))}>パスした記事をもう一度見る</button></div>}
         {stories.filter((story) => page !== 'favorites' || favorites.includes(story.id)).length === 0 && <div className="collection-empty"><Icon name="heart" size={36} /><h2>心が動いたら、ハートを。</h2><p>お気に入りの記事が、ここに並びます。</p><button className="primary" onClick={() => { navigatePage('discover'); setFilter('すべて') }}>記事を見つける</button></div>}
         {page === 'favorites' && favorites.length > 0 && filteredStories.length === 0 && <p className="collection-empty">このカテゴリーにはまだ保存がありません。</p>}
       </section>}
@@ -256,6 +299,7 @@ export default function App() {
       <footer><span className="footer-brand">Mag Life.</span><p>予定と、雑誌と、まだ知らない毎日。</p><small>DEMO · 雑誌・記事・スポット・広告主はすべて架空です。予約・実店舗への送客は行いません。<br />所要時間は移動を含む目安です。位置情報・実際の営業時間との連携はありません。</small></footer>
     </main>
     <div className="toast" role="status" aria-live="polite">{toast && <><Icon name="check" size={17} />{toast}</>}</div>
+    {detail && <EventDetail event={detail} close={() => setDetail(null)} favorite={favorites.includes((stories.find((story) => story.id === detail.storyId) ?? stories.find((story) => story.id === (detail.category === 'work' ? 'style' : 'beauty'))!).id)} onFavorite={favorite} onEdit={() => { setEditor(detail); setDetail(null) }} onOpen={(story) => { setDetail(null); setArticle(story) }} />}
     {editor && <EventForm key={editor.id} event={editor} events={events} close={() => setEditor(null)} onSave={(event) => { persist([...events.filter((item) => item.id !== event.id), event]); selectDate(event.date); setEditor(null); setToast('予定を保存しました') }} onDelete={() => { persist(events.filter((event) => event.id !== editor.id)); setEditor(null); setToast('予定を削除しました') }} />}
     {article && <Modal label={article.title.replace('\n', '')} wide close={() => setArticle(null)}><article className="article-detail"><div className="article-cover"><img src={image(article)} alt={article.spot} />{article.sponsored && <span className="pr-badge">PR · {article.sponsored}</span>}</div><div className="article-body"><p className="magazine-label">{article.magazine} <span>{article.issue}</span></p><p className="eyebrow">{article.label}</p><h2>{article.title}</h2><p className="article-subtitle">{article.subtitle}</p>{article.sponsored && <p className="article-disclosure">PR · {article.spot} 提供の架空のタイアップ記事です。</p>}<div className="article-prose">{article.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div><section className="spot-info"><p className="eyebrow">SPOT INFORMATION</p><h3>{article.spot}</h3><dl><div><dt>エリア</dt><dd>{article.address}</dd></div><div><dt>営業時間</dt><dd>{article.hours}（デモ設定）</dd></div><div><dt>所要時間</dt><dd>{article.duration}分（移動を含む目安）</dd></div><div><dt>予算</dt><dd>{article.price}</dd></div></dl><p>この記事・雑誌名・スポットはオリジナルの架空コンテンツです。</p></section><div className="article-booking"><label>お出かけする日<input type="date" value={selected} min="1900-01-01" max="2100-12-31" onChange={(e) => { if (e.target.value) selectDate(e.target.value) }} /></label><p>{scheduledStory(article) ? 'この日のカレンダーに追加済みです' : available(article) ? `${clock(storyStart(article, available(article)!))}–${clock(storyStart(article, available(article)!) + article.duration)} の空き時間に追加できます` : 'この日に合う空き時間がありません。別の日を選んでください。'}</p><div><button className="primary" disabled={!available(article) || scheduledStory(article)} onClick={() => addStory(article)}><Icon name={scheduledStory(article) ? 'check' : 'plus'} size={18} />{scheduledStory(article) ? '追加済み' : '予定に追加'}</button><button className="secondary" aria-pressed={favorites.includes(article.id)} onClick={() => favorite(article)}><Icon name="heart" size={18} />{favorites.includes(article.id) ? '保存済み' : 'お気に入り'}</button></div></div></div></article></Modal>}
   </div>

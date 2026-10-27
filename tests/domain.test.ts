@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
 import { clock, createDemoEvents, dateKey, freeSlots, isEvent, minutes, moveDate, overlaps, parseDate } from '../src/events.ts'
 import type { CalendarEvent } from '../src/events.ts'
-import { dayPlan, fits, stories, storyStart, storyTone } from '../src/stories.ts'
+import { dayPlan, fits, magazineEditions, magazineFor, stories, storyCategory, storyStart, storyTone } from '../src/stories.ts'
 import { planConflict, planEvents } from '../src/plans.ts'
 import { loadData, saveData } from '../src/storage.ts'
 
@@ -36,6 +36,8 @@ test('free-time detection merges nested, overlapping and touching busy periods',
 
 test('event validation rejects invalid dates, reversed times and malformed persisted data', () => {
   assert.ok(isEvent(event(540, 600)))
+  assert.ok(isEvent({ ...event(540, 600), place: '表参道' }))
+  assert.equal(isEvent({ ...event(540, 600), place: 42 }), false)
   for (const bad of [null, {}, { ...event(540, 600), title: ' ' }, { ...event(540, 600), date: '2026-02-30' }, event(600, 540), event(-1, 600), event(600, 1440), event(600.5, 700), { ...event(540, 600), category: 'bad' }]) assert.equal(isEvent(bad), false)
 })
 
@@ -70,14 +72,32 @@ test('recommendations fit actual gap length and their opening hours', () => {
   assert.equal(fits(wine, { start: 1290, end: 1439 }), false)
 })
 
-test('every story photograph and the hero are bundled for subpath deployment without external APIs', () => {
+test('every story image and the hero are bundled for subpath deployment without external APIs', () => {
   for (const name of new Set(['hero.jpg', ...stories.map((story) => story.image)])) {
     const bytes = readFileSync(new URL(`../public/images/${name}`, import.meta.url))
     assert.ok(bytes.length > 1000, name)
-    assert.equal(bytes.readUInt16BE(0), 0xffd8, name)
+    if (name.endsWith('.svg')) assert.match(bytes.toString(), /^<svg[^>]+xmlns="http:\/\/www.w3.org\/2000\/svg"/)
+    else assert.equal(bytes.readUInt16BE(0), 0xffd8, name)
   }
   const notices = readFileSync(new URL('../public/images/THIRD-PARTY-NOTICES.txt', import.meta.url), 'utf8')
   assert.ok(notices.includes('MIT License') && notices.includes('Sadee') && notices.includes('Start Bootstrap'))
+})
+
+test('six fictional editorial brands include beauty and working-women fashion with compatible recommendations', () => {
+  assert.equal(magazineEditions.length, 6)
+  assert.equal(new Set(magazineEditions.map((edition) => edition.name)).size, 6)
+  for (const edition of magazineEditions) {
+    const story = stories.find((item) => item.magazine === edition.name)!
+    assert.ok(story)
+    assert.equal(magazineFor(story), edition)
+    assert.ok(edition.product && edition.price && edition.genre)
+    assert.ok(readFileSync(new URL(`../public/images/${edition.image}`, import.meta.url)).length > 1000)
+  }
+  const beauty = stories.find((story) => story.id === 'beauty')!
+  assert.equal(storyCategory(beauty), 'ビューティー')
+  assert.ok(fits(beauty, { start: 1080, end: 1125 }))
+  assert.equal(fits(beauty, { start: 1080, end: 1124 }), false)
+  assert.equal(storyCategory(stories.find((story) => story.id === 'style')!), 'ファッション')
 })
 
 test('demo starts with a full week of editable, conflict-free events and colorful magazine outings', () => {
