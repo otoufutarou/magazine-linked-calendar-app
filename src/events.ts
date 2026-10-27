@@ -6,6 +6,7 @@ export type CalendarEvent = {
   end: number
   category: 'work' | 'personal' | 'outing'
   note: string
+  place?: string
   storyId?: string
 }
 
@@ -66,6 +67,7 @@ export function isEvent(value: unknown): value is CalendarEvent {
     && event.end <= 1439 && event.end > event.start
     && ['work', 'personal', 'outing'].includes(String(event.category))
     && typeof event.note === 'string'
+    && (event.place === undefined || typeof event.place === 'string')
     && (event.storyId === undefined || typeof event.storyId === 'string')
 }
 

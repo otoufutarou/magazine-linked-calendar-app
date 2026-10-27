@@ -10,18 +10,18 @@
   font-weight: 400;
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 360px; }
+body { margin: 0; min-width: 320px; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; color: inherit; }
 button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 button { transition: background .2s, color .2s, box-shadow .2s, transform .2s; }
 button:disabled { cursor: not-allowed; opacity: .5; }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid #679fcd; outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid #c52d48; outline-offset: 3px; }
 h1, h2, h3, p { margin: 0; }
 button svg { flex-shrink: 0; }
 button { border: 0; }
 img { display: block; width: 100%; object-fit: cover; }
-::selection { background: #d7eaff; }
+::selection { background: #ffd5dc; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
