@@ -16,10 +16,10 @@ import './App.css'
 import './Timeline.css'
 import { selectEditorialCopy } from './data/editorialCopies'
 import type { EditorialCategory } from './data/editorialCopies'
+import { MonthCalendar, WeekCalendar } from './CalendarViews'
 
 type Page = 'calendar' | 'discover' | 'favorites' | 'plans'
 type View = 'day' | 'week' | 'month'
-const weekdays = ['日', '月', '火', '水', '木', '金', '土']
 const fullDate = new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'long' })
 const image = (story: Story) => `${import.meta.env.BASE_URL}images/${story.image}`
 function editorialCategory(category: string | undefined): EditorialCategory | undefined {
@@ -367,18 +367,8 @@ export default function App() {
           <section className="calendar-panel" aria-label="カレンダー">
             <div className="section-heading"><div><p className="eyebrow">MY CALENDAR</p><h2>わたしのカレンダー</h2></div><span className="subtle">予定も、楽しみも。</span></div>
             <div className="calendar-toolbar"><div className="date-nav"><h3>{selectedDate.getFullYear()}<span>年</span> {selectedDate.getMonth() + 1}<span>月</span></h3><button className="icon-button" onClick={() => navigate(-1)} aria-label={`前の${view === 'month' ? '月' : view === 'week' ? '週' : '日'}`}>‹</button><button className="icon-button" onClick={() => navigate(1)} aria-label={`次の${view === 'month' ? '月' : view === 'week' ? '週' : '日'}`}>›</button><button className="today-button" onClick={() => selectDate(today)}>今日</button></div><div className="view-switch" aria-label="カレンダー表示">{([['day', '日'], ['week', '週'], ['month', '月']] as const).map(([id, label]) => <button key={id} onClick={() => setView(id)} aria-pressed={view === id}>{label}</button>)}</div></div>
-            {view !== 'day' && <div className={`calendar-grid ${view}`} style={{ '--columns': 7 } as React.CSSProperties}>
-              {view === 'month' && ['月', '火', '水', '木', '金', '土', '日'].map((day) => <span className="weekday" key={day}>{day}</span>)}
-              {days.map((date) => {
-                const day = parseDate(date)
-                const items = events.filter((event) => event.date === date).sort((a, b) => a.start - b.start)
-                const limit = view === 'month' ? 2 : 5
-                return <div className={`calendar-cell ${date === selected ? 'selected' : ''} ${day.getMonth() !== selectedDate.getMonth() ? 'outside' : ''}`} key={date}>
-                  <button className={`date-button ${date === today ? 'is-today' : ''}`} onClick={() => { selectDate(date); setView('day') }} aria-pressed={date === selected} aria-current={date === today ? 'date' : undefined} aria-label={`${fullDate.format(day)}、予定${items.length}件`}>{view !== 'month' && <span>{weekdays[day.getDay()]}</span>}<strong>{day.getDate()}</strong></button>
-                  <div className="cell-events">{items.slice(0, limit).map((event) => <button className={`mini-event ${event.category} category-${displayCategory(event)}`} key={event.id} title={`${clock(event.start)}–${clock(event.end)} ${event.title}`} onClick={() => { selectDate(date); setDetail(event) }}><time>{clock(event.start)}</time><span>{event.storyId && stories.find((story) => story.id === event.storyId)?.sponsored ? 'PR · ' : ''}{event.title}</span></button>)}{items.length > limit && <button className="more-events" onClick={() => { selectDate(date); setView('day') }}>+{items.length - limit}件</button>}{items.length === 0 && <span className="free-day">余白</span>}</div>
-                </div>
-              })}
-            </div>}
+            {view === 'month' && <MonthCalendar days={days} selected={selected} today={today} selectedMonth={selectedDate.getMonth()} events={events} onSelectDate={(date) => { selectDate(date); setView('day') }} onOpenEvent={setDetail} />}
+            {view === 'week' && <WeekCalendar days={days} selected={selected} today={today} selectedMonth={selectedDate.getMonth()} events={events} onSelectDate={(date) => { selectDate(date); setView('day') }} onOpenEvent={setDetail} />}
             <div className="calendar-legend"><span><i className="work-dot" />確定した予定</span><span><i className="proposal-dot" />雑誌からの仮提案</span><span className="local-label">デモ推薦 · 移動目安10分 · 最大3件</span></div>
             {view === 'day' && <div className="day-agenda">
               <div className="agenda-heading"><h3>{fullDate.format(selectedDate)}</h3><button className="text-button" onClick={newEvent}><Icon name="plus" size={15} />予定を追加</button></div>
