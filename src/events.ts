@@ -4,13 +4,17 @@ export type CalendarEvent = {
   date: string
   start: number
   end: number
-  category: 'work' | 'personal' | 'outing'
+  category: 'work' | 'personal' | 'outing' | 'date' | 'gourmet' | 'beauty' | 'travel' | 'hobby' | 'outdoor'
   note: string
   place?: string
   storyId?: string
 }
 
 export type FreeSlot = { start: number; end: number }
+export const eventCategories = {
+  work: '仕事', personal: 'プライベート', outing: 'お出かけ', date: 'デート',
+  gourmet: 'グルメ', beauty: '美容', travel: '旅行', hobby: '趣味', outdoor: 'アウトドア',
+}
 
 export function dateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -65,7 +69,7 @@ export function isEvent(value: unknown): value is CalendarEvent {
     && typeof event.start === 'number' && Number.isInteger(event.start) && event.start >= 0
     && typeof event.end === 'number' && Number.isInteger(event.end)
     && event.end <= 1439 && event.end > event.start
-    && ['work', 'personal', 'outing'].includes(String(event.category))
+    && typeof event.category === 'string' && Object.hasOwn(eventCategories, event.category)
     && typeof event.note === 'string'
     && (event.place === undefined || typeof event.place === 'string')
     && (event.storyId === undefined || typeof event.storyId === 'string')
