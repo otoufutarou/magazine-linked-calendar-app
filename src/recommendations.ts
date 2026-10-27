@@ -16,14 +16,36 @@ export function suggestionSlots(events: CalendarEvent[], date: string): FreeSlot
 
 export function dailySuggestions(events: CalendarEvent[], date: string, skipped: string[] = []): Suggestion[] {
   const result: Suggestion[] = []
-  const used = new Set([...skipped, ...events.filter((event) => event.date === date).map((event) => event.storyId)])
+  const dayEvents = events.filter((event) => event.date === date)
+  const used = new Set([...skipped, ...dayEvents.map((event) => event.storyId)])
   const gaps = suggestionSlots(events, date)
+  const weekday = new Date(`${date}T00:00:00`).getDay()
+  const weekend = weekday === 0 || weekday === 6
+  const contextType = [...dayEvents].sort((a, b) => a.start - b.start)
+    .find((event) => event.category === 'date' || event.category === 'work' || event.category === 'outdoor')?.category
+  const dateSeed = Number(date.replaceAll('-', ''))
+  function editorialFit(story: Story, gap: FreeSlot): number {
+    const category = storyCategory(story)
+    if (contextType === 'date') return ['ビューティー', 'ファッション', 'グルメ'].includes(category) ? 3 : 0
+    if (contextType === 'work') {
+      if (gap.start >= 17 * 60) return category === 'グルメ' ? 4 : ['カルチャー', '自然'].includes(category) ? 2 : 0
+      return ['カルチャー', 'グルメ', 'ファッション'].includes(category) ? 3 : 0
+    }
+    if (contextType === 'outdoor') return ['自然', 'カルチャー', 'グルメ'].includes(category) ? 4 : 0
+    if (weekend) return ['自然', 'カルチャー', 'グルメ'].includes(category) ? 3 : 0
+    if (gap.start >= 17 * 60) return category === 'グルメ' ? 2 : 0
+    return 0
+  }
+  function dailyRank(story: Story): number {
+    return [...story.id].reduce((sum, character) => (sum * 31 + character.charCodeAt(0)) >>> 0, dateSeed)
+  }
   // Fill separate gaps first, then offer a second stop only if room remains.
   for (let pass = 0; pass < 3 && result.length < 3; pass++) {
     for (const gap of gaps) {
       const options = stories.filter((story) => storyKind(story) === 'experience' && !used.has(story.id) && fits(story, gap))
       options.sort((a, b) => storyStart(a, gap) - storyStart(b, gap)
-        || (gap.end - gap.start < 120 ? a.duration - b.duration : 0))
+        || editorialFit(b, gap) - editorialFit(a, gap)
+        || (gap.end - gap.start < 120 ? a.duration - b.duration : dailyRank(a) - dailyRank(b)))
       const story = options[0]
       if (!story) continue
       const start = storyStart(story, gap)

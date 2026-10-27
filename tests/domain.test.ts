@@ -49,8 +49,8 @@ test('overlap detection allows adjacency and editing the same event', () => {
   assert.equal(overlaps(saved, { ...event(540, 700, 'new'), date: '2026-10-31' }), false)
 })
 
-test('at least fifteen original stories include all three explicitly labeled advertising formats', () => {
-  assert.ok(stories.length >= 15)
+test('at least thirty original recommendations cover diverse magazines and labeled advertising formats', () => {
+  assert.ok(stories.length >= 30)
   assert.equal(new Set(stories.map((story) => story.id)).size, stories.length)
   assert.deepEqual(new Set(stories.filter((story) => story.sponsored).map((story) => story.sponsored)), new Set(['Sponsored Recommendation', 'Calendar Native Ads', 'Editorial Sponsored Story']))
   for (const story of stories) {
@@ -100,12 +100,14 @@ test('six fictional editorial brands include beauty and working-women fashion wi
   assert.equal(storyCategory(stories.find((story) => story.id === 'style')!), 'ファッション')
 })
 
-test('demo starts with a full week of editable, conflict-free events and colorful magazine outings', () => {
+test('demo starts with varied, editable appointments, conflict-free outings and intentional empty days', () => {
   for (let day = 25; day <= 31; day++) {
     const today = new Date(2026, 9, day)
     const events = createDemoEvents(today)
     assert.ok(events.every(isEvent))
-    for (let offset = 0; offset < 7; offset++) assert.ok(events.some((item) => item.date === moveDate(dateKey(today), offset)))
+    const weekDates = Array.from({ length: 7 }, (_, offset) => moveDate(dateKey(today), offset))
+    assert.ok(weekDates.filter((date) => events.some((item) => item.date === date)).length >= 5)
+    assert.ok(weekDates.some((date) => !events.some((item) => item.date === date)))
     assert.equal(new Set(events.map((item) => item.id)).size, events.length)
     for (const item of events) assert.equal(overlaps(events, item), false, `${item.date}: ${item.title}`)
     for (const item of events.filter((item) => item.storyId)) {

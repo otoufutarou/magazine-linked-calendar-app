@@ -77,18 +77,33 @@ export function isEvent(value: unknown): value is CalendarEvent {
 
 export function createDemoEvents(today: Date): CalendarEvent[] {
   const events: CalendarEvent[] = []
+  const quietDates = new Set<string>()
   for (let offset = -14; offset <= 35; offset++) {
     const date = moveDate(dateKey(today), offset)
     const weekday = parseDate(date).getDay()
-    if (weekday > 0 && weekday < 6) {
-      events.push(
-        { id: `demo-am-${date}`, title: weekday === 1 ? 'チームミーティング' : '集中ワーク', date, start: 540, end: 720, category: 'work', note: 'デモユーザーのサンプル予定です。自由に編集できます。' },
-        { id: `demo-pm-${date}`, title: 'プロジェクトワーク', date, start: 780, end: 1080, category: 'work', note: '18時にお仕事終了。帰り道に寄り道を。' },
-      )
-      if (weekday === 3) events.push({ id: `demo-yoga-${date}`, title: '夜のヨガ', date, start: 1200, end: 1260, category: 'personal', note: 'ヨガマットを忘れずに。' })
-    } else {
-      events.push({ id: `demo-weekend-${date}`, title: weekday === 6 ? 'ゆっくり朝ごはん' : '散歩と買いもの', date, start: 600, end: 660, category: 'personal', note: '自分のための時間。' })
+    if (offset >= 0 && offset % 10 === 4) {
+      quietDates.add(date)
+      continue
     }
+    const sample = [
+      [{ title: 'チームミーティング', start: 540, end: 600, category: 'work' as const }, { title: 'クライアント打ち合わせ', start: 780, end: 840, category: 'work' as const }, { title: 'ジム', start: 1140, end: 1200, category: 'personal' as const }],
+      [{ title: '資料作成', start: 600, end: 720, category: 'work' as const }, { title: '同僚とランチ', start: 750, end: 810, category: 'gourmet' as const }],
+      [{ title: 'オフィス出社', start: 570, end: 630, category: 'work' as const }, { title: 'プレゼン', start: 840, end: 900, category: 'work' as const }, { title: '映画鑑賞', start: 1140, end: 1260, category: 'hobby' as const }],
+      [{ title: 'カフェで作業', start: 660, end: 780, category: 'work' as const }, { title: '美容院', start: 900, end: 960, category: 'beauty' as const }],
+      [{ title: '企画会議', start: 600, end: 690, category: 'work' as const }, { title: '仕事終了', start: 960, end: 990, category: 'work' as const }, { title: '友人とディナー', start: 1170, end: 1290, category: 'gourmet' as const }],
+      [{ title: 'ショッピング', start: 660, end: 750, category: 'outing' as const }, { title: '展覧会', start: 900, end: 1020, category: 'hobby' as const }],
+      [{ title: '朝カフェ', start: 600, end: 660, category: 'gourmet' as const }, { title: '散歩', start: 780, end: 840, category: 'outdoor' as const }],
+    ][weekday]
+    const visible = offset % 3 === 1 ? sample.slice(0, 1) : sample
+    for (const [index, item] of visible.entries()) events.push({
+      id: `demo-${date}-${index}`,
+      title: item.title,
+      date,
+      start: item.start,
+      end: item.end,
+      category: item.category,
+      note: 'デモ用のサンプル予定です。自由に編集できます。',
+    })
   }
   const outings = [
     { day: 2, storyId: 'wine', title: '余韻 / YOIN', start: 1080, duration: 90 },
@@ -100,6 +115,7 @@ export function createDemoEvents(today: Date): CalendarEvent[] {
   ]
   for (const outing of [...outings.map((item) => ({ ...item, day: item.day - 14 })), ...outings]) {
     let date = moveDate(dateKey(today), outing.day)
+    if (quietDates.has(date)) continue
     if (outing.storyId === 'art') date = moveDate(date, (6 - parseDate(date).getDay() + 7) % 7)
     const start = outing.storyId === 'art' ? 660 : ['shop', 'garden', 'coffee'].includes(outing.storyId) ? 720 : outing.start
     const duration = outing.storyId === 'art' ? 120 : outing.duration
@@ -109,7 +125,8 @@ export function createDemoEvents(today: Date): CalendarEvent[] {
         date = moveDate(date, 1)
       }
     }
-    events.push({ id: `demo-outing-${date}-${outing.storyId}`, title: outing.title, date, start, end: start + duration, category: 'outing', storyId: outing.storyId, note: '雑誌から見つけた架空のお出かけのサンプルです。自由に変更できます。' })
+    const candidate: CalendarEvent = { id: `demo-outing-${date}-${outing.storyId}`, title: outing.title, date, start, end: start + duration, category: 'outing', storyId: outing.storyId, note: '雑誌から見つけた架空のお出かけのサンプルです。自由に編集できます。' }
+    if (!overlaps(events, candidate)) events.push(candidate)
   }
   return events
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createDemoEvents, eventCategories, isEvent, overlaps } from '../src/events.ts'
+import { createDemoEvents, eventCategories, isEvent, moveDate, overlaps } from '../src/events.ts'
 import type { CalendarEvent } from '../src/events.ts'
 import { categoryForStory, dailySuggestions, positionEvents, storyKind, suggestionSlots } from '../src/recommendations.ts'
 import { fits, stories } from '../src/stories.ts'
@@ -66,6 +66,11 @@ test('skip excludes an experience for the whole date; edits and deletions recomp
   const confirmed: CalendarEvent = { ...busy(first[0].start, first[0].end), storyId: first[0].story.id, category: categoryForStory(first[0].story) }
   assert.ok(isEvent(confirmed))
   assert.equal(dailySuggestions([confirmed], date).some((item) => item.story.id === confirmed.storyId), false)
+})
+
+test('recommendation picks vary across dates and remain connected to available time', () => {
+  const picks = Array.from({ length: 7 }, (_, offset) => dailySuggestions([], moveDate(date, offset))[0]?.story.id)
+  assert.ok(new Set(picks).size >= 5)
 })
 
 test('overlapping timeline appointments get distinct lanes; touching ones share a lane', () => {
