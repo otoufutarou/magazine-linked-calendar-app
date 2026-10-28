@@ -85,16 +85,65 @@ export function createDemoEvents(today: Date): CalendarEvent[] {
       quietDates.add(date)
       continue
     }
-    const sample = [
-      [{ title: 'チームミーティング', start: 540, end: 600, category: 'work' as const }, { title: 'クライアント打ち合わせ', start: 780, end: 840, category: 'work' as const }, { title: 'ジム', start: 1140, end: 1200, category: 'personal' as const }],
-      [{ title: '資料作成', start: 600, end: 720, category: 'work' as const }, { title: '同僚とランチ', start: 750, end: 810, category: 'gourmet' as const }],
-      [{ title: 'オフィス出社', start: 570, end: 630, category: 'work' as const }, { title: 'プレゼン', start: 840, end: 900, category: 'work' as const }, { title: '映画鑑賞', start: 1140, end: 1260, category: 'hobby' as const }],
-      [{ title: 'カフェで作業', start: 660, end: 780, category: 'work' as const }, { title: '美容院', start: 900, end: 960, category: 'beauty' as const }],
-      [{ title: '企画会議', start: 600, end: 690, category: 'work' as const }, { title: '仕事終了', start: 960, end: 990, category: 'work' as const }, { title: '友人とディナー', start: 1170, end: 1290, category: 'gourmet' as const }],
-      [{ title: 'ショッピング', start: 660, end: 750, category: 'outing' as const }, { title: '展覧会', start: 900, end: 1020, category: 'hobby' as const }],
-      [{ title: '朝カフェ', start: 600, end: 660, category: 'gourmet' as const }, { title: '散歩', start: 780, end: 840, category: 'outdoor' as const }],
-    ][weekday]
-    const visible = offset % 3 === 1 ? sample.slice(0, 1) : sample
+    const week = Math.floor((offset + 14) / 7)
+    const travelDay = weekday === 3 && week % 3 === 1
+    const sample = weekday === 1
+      ? [
+        { title: 'チーム朝会', start: 570, end: 600, category: 'work' as const },
+        { title: '集中作業', start: 615, end: 720, category: 'work' as const },
+        { title: '同僚とランチ', start: 720, end: 780, category: 'gourmet' as const },
+        { title: week % 2 ? '1on1ミーティング' : '企画レビュー', start: 810, end: 855, category: 'work' as const },
+        { title: '資料レビュー', start: 900, end: 960, category: 'work' as const },
+        { title: 'ジム', start: 1080, end: 1140, category: 'personal' as const },
+      ]
+      : weekday === 2
+        ? [
+          { title: 'オフィスへ移動', start: 510, end: 570, category: 'work' as const },
+          { title: 'プロジェクト定例', start: 585, end: 630, category: 'work' as const },
+          { title: '集中作業', start: 645, end: 720, category: 'work' as const },
+          { title: '同僚とランチ', start: 720, end: 780, category: 'gourmet' as const },
+          { title: week % 2 ? 'クライアントMTG' : '制作チームMTG', start: 810, end: 870, category: 'work' as const },
+          { title: '提案資料の仕上げ', start: 900, end: 960, category: 'work' as const },
+          { title: '帰宅', start: 990, end: 1050, category: 'work' as const },
+        ]
+        : weekday === 3
+          ? travelDay
+            ? [
+              { title: '大阪出張・新幹線移動', start: 450, end: 570, category: 'work' as const },
+              { title: '取引先を訪問', start: 600, end: 690, category: 'work' as const },
+              { title: '先方とランチ', start: 690, end: 750, category: 'gourmet' as const },
+              { title: '導入相談MTG', start: 780, end: 870, category: 'work' as const },
+              { title: '新幹線で帰京', start: 900, end: 1020, category: 'work' as const },
+            ]
+            : [
+              { title: '集中作業', start: 570, end: 690, category: 'work' as const },
+              { title: 'デザイン確認MTG', start: 690, end: 735, category: 'work' as const },
+              { title: 'ランチ', start: 735, end: 795, category: 'gourmet' as const },
+              { title: 'チーム相談', start: 840, end: 900, category: 'work' as const },
+              { title: '映画鑑賞', start: 1110, end: 1230, category: 'hobby' as const },
+            ]
+          : weekday === 4
+            ? [
+              { title: '今週のタスク整理', start: 570, end: 600, category: 'work' as const },
+              { title: 'リモート作業', start: 615, end: 720, category: 'work' as const },
+              { title: 'ランチ', start: 720, end: 780, category: 'gourmet' as const },
+              { title: week % 2 ? 'パートナー企業とMTG' : 'プロダクト定例', start: 810, end: 870, category: 'work' as const },
+              { title: 'メール・翌日準備', start: 900, end: 945, category: 'work' as const },
+              { title: '美容院', start: 1020, end: 1080, category: 'beauty' as const },
+            ]
+            : weekday === 5
+              ? [
+                { title: '週次チームMTG', start: 600, end: 645, category: 'work' as const },
+                { title: '集中作業', start: 660, end: 720, category: 'work' as const },
+                { title: '同僚とランチ', start: 720, end: 780, category: 'gourmet' as const },
+                { title: '進捗共有', start: 810, end: 855, category: 'work' as const },
+                { title: '来週の準備', start: 870, end: 915, category: 'work' as const },
+                { title: '友人とディナー', start: 1080, end: 1200, category: 'gourmet' as const },
+              ]
+              : weekday === 6
+                ? [{ title: 'ショッピング', start: 660, end: 750, category: 'outing' as const }, { title: '展覧会', start: 900, end: 1020, category: 'hobby' as const }]
+                : [{ title: '朝カフェ', start: 600, end: 660, category: 'gourmet' as const }, { title: '散歩', start: 780, end: 840, category: 'outdoor' as const }]
+    const visible = offset % 3 === 1 ? sample.slice(0, 3) : sample
     for (const [index, item] of visible.entries()) events.push({
       id: `demo-${date}-${index}`,
       title: item.title,
@@ -121,6 +170,7 @@ export function createDemoEvents(today: Date): CalendarEvent[] {
     const duration = outing.storyId === 'art' ? 120 : outing.duration
     if (outing.storyId === 'art') {
       while ((parseDate(date).getDay() > 0 && parseDate(date).getDay() < 6)
+        || quietDates.has(date)
         || overlaps(events, { id: 'demo-art-candidate', title: outing.title, date, start, end: start + duration, category: 'outing', note: '' })) {
         date = moveDate(date, 1)
       }
