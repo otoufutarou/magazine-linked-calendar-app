@@ -101,6 +101,10 @@ test('six fictional editorial brands include beauty and working-women fashion wi
 })
 
 test('demo starts with varied, editable appointments, conflict-free outings and intentional empty days', () => {
+  const realisticWeek = createDemoEvents(new Date(2026, 9, 25))
+  assert.ok(realisticWeek.some((item) => item.title.includes('MTG')))
+  assert.ok(realisticWeek.some((item) => item.title.includes('出張')))
+  assert.ok(realisticWeek.some((item) => item.title === '取引先を訪問'))
   for (let day = 25; day <= 31; day++) {
     const today = new Date(2026, 9, day)
     const events = createDemoEvents(today)
